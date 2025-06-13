@@ -1,0 +1,356 @@
+\documentclass[11pt]{article}
+\setlength{\parindent}{0pt}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+
+\begin{document}
+
+\section{MILP}
+
+\subsection{Index Sets and Variables}
+
+\textbf{Sets:}
+
+Let $\mathcal{A}$ be the set of possible aperture stops,
+\begin{align}
+  \mathcal{A} &= \{a_{\min}, ... ,a_{\max}\}
+\end{align}
+indexed by the set,
+\begin{align}
+  [n_A] &= \{1,2,...,n_A\}, \quad n_A = |\mathcal{A}|
+\end{align}
+
+Let $\mathcal{T}$ be the set of possible exposure time stops,
+\begin{align}
+  \mathcal{T} &= \{t_{\min}, ... ,t_{\max}\}
+\end{align}
+indexed by the set,
+\begin{align}
+  [n_T] &= \{1,2,...,n_T\}, \quad n_T = |\mathcal{T}|
+\end{align}
+
+Let $\mathcal{S}$ be the set of possible ISO stops,
+\begin{align}
+  \mathcal{S} &= \{s_{\min}, ... ,s_{\max}\}
+\end{align}
+indexed by the set,
+\begin{align}
+  [n_S] &= \{1,2,...,n_S\}, \quad n_S = |\mathcal{S}|
+\end{align}
+
+\textbf{Decision variables:}
+\begin{align}
+  h_{flt} &\in \mathbb{R} \quad \text{(Flight height above launch)}\\
+  v_{vel} &\in \mathbb{R} \quad \text{(UAV velocity)}\\
+  y &\in \mathbb{R} \quad \text{(Epigraph variable for objective)}\\
+  x &\in \mathbb{R} \quad \text{(Auxiliary variable: }x = yv\text{)}\\
+  b_{i}^{(A)} &\in \{0,1\}, \quad i \in [n_A] \quad \text{(Aperture binary choice)}\\
+  b_{j}^{(T)} &\in \{0,1\}, \quad j \in [n_T] \quad \text{(Integration-time binary choice)}\\
+  b_{k}^{(S)} &\in \{0,1\}, \quad k \in [n_S] \quad \text{(ISO binary choice)}\\
+  b_{p}^{(L)} &\in \{0,1\}, \quad p \in [n_L] \quad \text{(ceiling function binary choice)}
+\end{align}
+
+\subsection{Constraints}
+
+\noindent
+One hot encoding:
+\begin{align}
+  \sum_{i \in [n_A]} b_i^{(A)} &=1\\
+  \sum_{j \in [n_T]} b_j^{(T)} &=1\\
+  \sum_{k \in [n_S]} b_k^{(S)} &=1
+\end{align}
+
+\subsubsection{Sensor Resolution}
+
+\begin{align}
+  h_l &\leq \frac{GSD_{req} \cdot f }{S_\delta} + z_{s,min} - z_l
+\end{align}
+
+\subsubsection{Diffraction Resolution}
+Given,
+\begin{align}
+  h_l &\leq \frac{GSD_{req} \cdot f}{2.44 \cdot N \cdot \lambda} + z_{s,min} - z_l
+\end{align}
+
+\noindent
+The linear constraint becomes,
+\begin{align}
+  h_l &\leq \alpha_i +z_{s,\min} - z_l + M_i^\alpha(1-b_i^{(A)}), \quad i \in [n_A]
+\end{align}
+
+\noindent
+Where, 
+
+\begin{align}
+  \alpha_i &= \frac{GSD_{req} \cdot f}{a_i \cdot 2.44 \cdot \lambda}, \quad i \in [n_A]\\
+  M_i^\alpha &= \max\{0, l, - \alpha_i - z_{s,\min} + z_l\}, \quad i \in [n_A]
+\end{align}
+
+
+\subsubsection{DOF Near Limit}
+Given,
+\begin{align}
+  h_l &\geq \frac{N \cdot c \cdot f \cdot s + s \cdot f^2}{N \cdot c \cdot (f+s) + f^2} + z_{s,\max} - z_l 
+\end{align}
+
+\noindent
+the linear constraint becomes,
+\begin{align}
+  h_l &\geq \beta_i + z_{s,\max} - z_l + M^{\beta}_i(1-b_i^{(A)}), \quad i \in [n_A]
+\end{align}
+
+\noindent
+where,
+
+\begin{align}
+  \beta_i &= \frac{a_i \cdot c \cdot f \cdot s + s \cdot f^2}{a_i \cdot c \cdot (f+s) + f^2}, \quad i \in [n_A]\\
+  M^\beta_i &= \max\{0, \beta_i + z_{s,\max} - z_l - l,\}, \quad i \in [n_A]
+\end{align}
+
+\subsubsection{DOF Far Limit}
+Given,
+\begin{align}
+  h_l &\leq \frac{N \cdot c \cdot f \cdot s + s \cdot f^2}{N \cdot c \cdot (f-s) + f^2} + z_{s,\min} - z_l 
+\end{align}
+\noindent
+the linear constraint becomes,
+\begin{align}
+  h_l &\leq \gamma_i + z_{s,\min} - z_l + M^\gamma_i(1-b_i^{(A)}), \quad i \in [n_A]
+\end{align}
+
+\noindent
+where,
+\begin{align}
+  \gamma_i &= \frac{a_i \cdot c \cdot f \cdot s + s \cdot f^2}{a_i \cdot c \cdot (f-s) + f^2}, \quad i \in [n_A] \\
+  M^\gamma_i &= \max\{0, h_{l,\max} - \gamma_i - z_{s,\min}+ z_l\}, \quad i \in [n_A] \\
+\end{align}
+
+\subsubsection{Motion Blur}
+Given,
+\begin{align}
+  v &\leq \frac{ S_\delta \cdot (h_l + z_l - z_{s,\max}) \cdot \delta_{\max}}{f \cdot I_t}
+\end{align}
+\noindent
+the linear constraint becomes,
+
+\begin{align}
+  v &\leq \zeta_j(h_l + z_l-z_{s,\max}) + M_j^\zeta(1-b_j^{(T)}), \quad j \in [n_T]\\
+\end{align}
+
+\noindent
+where,
+\begin{align}
+  \zeta_j &= \frac{S_\delta \cdot \delta_{\max}}{t_j \cdot f}, \quad j \in [n_T] \\
+  M_j^\zeta &= \max\{0, V_{\max} - \zeta_j(h_{l,\min} + z_l - z_{s,\max})\}, \quad j \in [n_T]
+\end{align}
+\subsubsection{Endlap}
+
+\begin{align}
+  v &\leq  \frac{I_{f,\max} \cdot S_y \cdot (1-\frac{EO_{req}}{100})}{f} \cdot (h_l + z_l - z_{s,max})
+\end{align}
+
+\subsubsection{Exposure}
+Given,
+\begin{align}
+  \log_2(\frac{N^2}{I_t}) + \log_2(\frac{100}{ISO}) = EV 
+\end{align}
+\noindent
+the linear constraint becomes,
+\begin{align}
+  \sum_{i \in [n_A]} \eta_ib_i^{(A)} - \sum_{j \in [n_T]} \theta_jb_j^{(T)} - \sum_{k \in [n_S]} \mu_kb_k^{(S)} &= \xi + s^+ - s^-
+\end{align}
+\noindent
+where,
+\begin{align}
+  \eta_i &= 2\log_2(a_i), \quad i \in [n_A]\\
+  \theta_j &= \log_2(t_j), \quad j \in [n_T]\\
+  \mu_k &= \log_2(s_k), \quad  k \in [n_S]\\
+  \xi &= EV - \log_2(100)\\
+  s^- &\geq 0\\
+  s^+ &\leq \epsilon
+\end{align}
+\newpage
+\subsection{Objective}
+\begin{align}
+  \text{Flight Time} &= \frac{S_n \cdot (A_y + G_S) + A_x + G_E}{F_{v}}\\
+  &= \frac{\lceil\frac{A_x + \frac{S_x \cdot h}{f}}{\frac{S_x \cdot h}{f} \cdot (1-\frac{SO}{100})}\rceil \cdot (A_y + \frac{S_x \cdot h }{f}) + A_x + \frac{S_y \cdot h}{f}}{v}\\
+  f(h,v)&= \frac{\lceil\frac{\sigma_1 + \sigma_2h}{\sigma_3h}\rceil \cdot (\sigma_4 + \sigma_2h) + \sigma_1 + \sigma_5h}{v}\\
+\end{align}
+where,
+\begin{align}
+  \sigma_1 &= A_x\\
+  \sigma_2 &= \frac{S_x}{f}\\
+  \sigma_3 &= \frac{S_x}{f}(1-\frac{SO}{100})\\
+  \sigma_4 &= A_y\\
+  \sigma_5 &= \frac{S_y}{f}
+\end{align}
+\subsection{Flight Lines}
+To linearise the ceiling function 
+\begin{align}
+  \lceil\frac{\sigma_1 + \sigma_2h_l}{\sigma_3h_l}\rceil
+\end{align} 
+we introduce the variable,
+\begin{align}
+  l &\in \mathbb{Z}\\
+  l-1 &\leq \frac{\sigma_1 + \sigma_2h_l}{\sigma_3h_l} < l \label{eq:ceilingConstraint}\\
+  l_{\min} &\leq l \leq l_{\max}
+\end{align}
+This set of inequalities ensures that $l = \lceil\frac{\sigma_1 + \sigma_2h}{\sigma_3h}\rceil$. To determine the bounds, $l_{\min}$ and $l_{\max}$, notice,
+
+\begin{align}
+  \frac{\sigma_1 + \sigma_2h_l}{\sigma_3h_l} &= \frac{\sigma_{1}}{\sigma_{3}\,h_l} + \frac{\sigma_{2}}{\sigma_{3}}
+\end{align}
+
+which is strictly decreasing for $\sigma_1,\sigma_2,\sigma_3,h_l > 0$. Therefore,
+
+\begin{align}
+  \min_{h_l \in [h_{l,\min},h_{l,\max}]}\{\frac{\sigma_1 + \sigma_2h_l}{\sigma_3h_l}\} &= \frac{\sigma_1 + \sigma_2h_{l,\max}}{\sigma_3h_{l,\max}}\\
+  \max_{h_l \in [h_{l,\min},h_{l,\max}]}\{\frac{\sigma_1 + \sigma_2h_l}{\sigma_3h_l}\} &= \frac{\sigma_1 + \sigma_2h_{l,\min}}{\sigma_3h_{l,\min}}
+\end{align}
+and,
+\begin{align}
+  l_{\min} &= \lceil \frac{\sigma_1 + \sigma_2h_{l,\max}}{\sigma_3h_{l,\max}}\rceil\\
+  l_{\max} &= \lceil \frac{\sigma_1 + \sigma_2h_{l,\min}}{\sigma_3h_{l,\min}}\rceil
+\end{align}
+
+Whilst the ceiling function has been handled, Equation \ref{eq:ceilingConstraint} is is bilinear. Thus we define the set of all possible values of $l$,
+\begin{align}
+  \mathcal{L} &= \{l_{\min}, l_{\min} + 1, ..., l_{\max}\}
+\end{align}
+indexed by,
+\begin{align}
+  [n_L] &= \{1,2,...,n_L\}, \quad n_L = |\mathcal{L}|
+\end{align}
+and the binary decision variable,
+\begin{align}
+  b_p^{(L)} &\in \{0,1\}, \quad p \in [n_L]\\
+  \sum_{p \in [n_L]} b_p^{(L)} &= 1\\
+  %l &= \sum_{p \in [n_L]} l_pb_p^{(L)}
+\end{align}
+
+Now Equation \ref{eq:ceilingConstraint} can be expressed using big M notation as,
+\begin{align}
+  \sigma_3h_l(l_p-1) &\leq \sigma_1 + \sigma_2h_l +M_p^{(lower)}(1-b_p^{(L)}), \quad \forall \quad p \in [n_L]
+\end{align}
+where,
+\begin{align}
+  M_p^{(lower)} &= \max_{h_l \in [h_{l,\min}, h_{l,\max}]}\{\sigma_3h_l(l_p-1)-\sigma_1 - \sigma_2h_l\} , \quad \forall \quad p \in [n_L]
+\end{align}
+and 
+\begin{align}
+  \sigma_1 + \sigma_2h_l &\leq \sigma_3h_ll_p - \epsilon + M_p^{(upper)}(1-b_p^{(L)}), \quad \forall \quad p \in [n_L]
+\end{align}
+where $\epsilon>0$ is a small constant used to allow the soft inequality and,
+\begin{align}
+  M_p^{(upper)} &= \max_{h_l \in [h_{l,\min}, h_{l,\max}]}\{\sigma_1 + \sigma_2h_l-\sigma_3h_ll_p + \epsilon\}, \quad \forall \quad p \in [n_L]
+\end{align}
+
+\subsection{Binary Continuous Product Linearisation}
+This transforms the objective function to,
+\begin{align}
+  f(h,v) &= \frac{\sum_{p \in [n_L]}l_pb_p(\sigma_4 + \sigma_2h_l)+\sigma_1 + \sigma_5h_l}{v}
+\end{align}
+Let $q$ reprent the continuous linear function of $h_l$,
+\begin{align}
+  q &= \sigma_4 + \sigma_2h_l\\
+  q_{\max} &= \sigma_4 + \sigma_2h_{l,\max}\\
+  q_{\min} &= \sigma_4 + \sigma_2h_{l,\min}
+\end{align}
+and $r_p$ be the product of the binary variable $b_p^{(L)}$ and $q$,
+\begin{align}
+  r_p &= b_pq, \quad \forall \quad p \in [n_L] \label{eq:binCont}
+\end{align}
+
+The following linear constraints enforce Equation \ref{eq:binCont},
+\begin{align}
+  r_{p} &\leq q_{\max}\,b_{p}^{(L)}, \quad \forall\,p\in [n_L] \\
+  r_{p} &\geq q_{\min}\,b_{p}^{(L)}, \quad \forall\,p\in [n_L] \\
+  r_{p} &\leq q - q_{\min}(1 - b_{p}^{(L)}), \quad \forall\,p\in [n_L] \\
+  r_{p} &\geq q - q_{\max}(1 - b_{p}^{(L)}), \quad \forall\,p\in [n_L]
+\end{align}
+
+When $b_p = 1$, these constraints force $r_p$ to equal $q$. When $b_p = 0$, they force $r_p = 0$, regardless of the value of $q$. Now,
+\begin{align}
+  f(h,v) &= \frac{w}{v}
+\end{align}
+where $w$ is the linear function of $h_l$,
+\begin{align}
+  w &= \sum_{p \in [n_L]}l_pr_p+\sigma_1 + \sigma_5h_l
+\end{align}
+Introducing the epigraph variable $y$ allows a linear objective,
+\begin{align}
+  \min y
+\end{align}
+but introduces the bilinear constraint,
+\begin{align}
+  yv &\geq w \label{eq:epigraphCon}
+\end{align}
+however, using McCormick envelopes we can linearise Equation \ref{eq:epigraphCon} given we can calculate the bounds on $y$ and $v$.
+
+\subsubsection{Epigraph linearisation via McCormick envelopes}
+
+Let $x$ represent the bilinear term,
+\begin{align}
+  x &= yv \label{eq:bilinearEpigraph}
+\end{align}
+and enforce
+\begin{align}
+  w &\leq x
+\end{align}
+The McCormick envelopes provide the tightest convex relaxation of the bilinear constraint \ref{eq:bilinearEpigraph}:
+\begin{align}
+  x &\ge y_{\min} v + v_{\min} y - y_{\min} v_{\min} \\
+  x &\ge y_{\max} v + v_{\max} y - y_{\max} v_{\max} \\
+  x &\le y_{\min} v + v_{\max} y - y_{\min} v_{\max} \\
+  x &\le y_{\max} v + v_{\min} y - y_{\max} v_{\min}
+\end{align}
+where,
+\begin{align}
+  v_{\min} &= v_{\min}\\
+  v_{\max} &= v_{\max}\\
+  y_{\min} &= \frac{l_{\min}q_{\min} +\sigma_1 + \sigma_5h_{l,min}}{v_{\max}}\\
+  y_{\max} &= \frac{l_{\max}q_{\max} +\sigma_1 + \sigma_5h_{l,max}}{v_{\min}}
+\end{align}
+
+These four linear inequalities, together with the auxiliary variable $x$, replace the bilinear constraint \(y v \ge w\).
+
+
+\section{Program Summary}
+
+\begin{align*}
+  \min_{v,h_l,q,r,y,x,w,b^{(A)},b^{(T)},b^{(S)},b^{(L)},s^+,s^-} \quad \quad & y\\
+  \text{s.t.} \quad \quad w &= \sum_{p \in [n_L]}l_pr_p+\sigma_1 + \sigma_5h_l\\
+  w &\leq x\\
+  \\
+  x &\ge y_{\min} v + v_{\min} y - y_{\min} v_{\min} \\
+  x &\ge y_{\max} v + v_{\max} y - y_{\max} v_{\max} \\
+  x &\le y_{\min} v + v_{\max} y - y_{\min} v_{\max} \\
+  x &\le y_{\max} v + v_{\min} y - y_{\max} v_{\min} \\
+  \\
+  q &= \sigma_4 + \sigma_2h_l\\
+  r_{p} &\leq q_{\max}\,b_{p}^{(L)}, \quad \forall\,p\in [n_L] \\
+  r_{p} &\geq q_{\min}\,b_{p}^{(L)}, \quad \forall\,p\in [n_L] \\
+  r_{p} &\leq q - q_{\min}(1 - b_{p}^{(L)}), \quad \forall\,p\in [n_L] \\
+  r_{p} &\geq q - q_{\max}(1 - b_{p}^{(L)}), \quad \forall\,p\in [n_L]\\
+  \\
+  \sigma_3h_l(l_p-1) &\leq \sigma_1 + \sigma_2h_l +M_p^{(lower)}(1-b_p^{(L)}), \quad \forall \quad p \in [n_L]\\
+  \sigma_1 + \sigma_2h_l &\leq \sigma_3h_ll_p - \epsilon + M_p^{(upper)}(1-b_p^{(L)}), \quad \forall \quad p \in [n_L]\\
+  \\
+  h_l &\leq \frac{GSD_{req} \cdot f }{S_\delta} + z_{s,min} - z_l\\
+  h_l &\leq \alpha_i +z_{s,\min} - z_l + M_i^\alpha(1-b_i^{(A)}), \quad i \in [n_A]\\
+  h_l &\geq \beta_i + z_{s,\max} - z_l + M^{\beta}_i(1-b_i^{(A)}), \quad i \in [n_A]\\
+  h_l &\leq \gamma_i + z_{s,\min} - z_l + M^\gamma_i(1-b_i^{(A)}), \quad i \in [n_A]\\
+  \\
+  v &\leq \zeta_j(h_l + z_l-z_{s,\max}) + M_j^\zeta(1-b_j^{(T)}), \quad j \in [n_T]\\
+  v &\leq  \frac{I_{f,\max} \cdot S_y \cdot (1-\frac{EO_{req}}{100})}{f} \cdot (h_l + z_l - z_{s,max})\\
+  \\
+  \xi + s^+ - s^-&= \sum_{i \in [n_A]} \eta_ib_i^{(A)} - \sum_{j \in [n_T]} \theta_jb_j^{(T)} - \sum_{k \in [n_S]} \mu_kb_k^{(S)}\\
+  \\
+  \sum_{i \in [n_A]} b_i^{(A)} &=1\\
+  \sum_{j \in [n_T]} b_j^{(T)} &=1\\
+  \sum_{k \in [n_S]} b_k^{(S)} &=1\\
+  \sum_{p \in [n_L]} b_p^{(L)} &=1\\
+\end{align*}
+
+\end{document}
